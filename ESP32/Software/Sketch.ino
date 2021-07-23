@@ -6,9 +6,9 @@
 #include "./Configuration/Blynk.h"
 
 // Libraries
-#include <BlynkSimpleEsp32.h>
-#include <WiFi.h>
-#include <WiFiClient.h>
+#include <BlynkSimpleEsp32.h>  // Part of Blynk by Volodymyr Shymanskyy
+#include <WiFi.h>              // Part of WiFi Built-In by Arduino
+#include <WiFiClient.h>        // Part of WiFi Built-In by Arduino
 #include <math.h>
 #include <pthread.h>
 
@@ -161,7 +161,7 @@ void WaitForBlynk(int cycleDelayInMilliSeconds) {
   }
 }
 
-void ConnectToWifi(char* ssid, char* pass) {
+void ConnectToWifi(const char* ssid, const char* pass) {
   if (!WiFi.isConnected()) {
     Serial.printf("Connecting to Wifi: %s\n", ssid);
     try {
@@ -181,7 +181,7 @@ void ConnectToWifi(char* ssid, char* pass) {
 
 void ConnectToBlynk() {
   if (!Blynk.connected()) {
-    if (BLYNK_LOCAL_SERVER_USAGE)
+    if (BLYNK_USE_LOCAL_SERVER)
       Blynk.begin(BLYNK_AUTH, WIFI_SSID, WIFI_PW, BLYNK_SERVER, BLYNK_PORT);
     else
       Blynk.begin(BLYNK_AUTH, WIFI_SSID, WIFI_PW);
