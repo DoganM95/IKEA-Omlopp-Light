@@ -33,3 +33,4 @@ If blynk cloud should be used (may be pricey)
 ### Software to control the system
 
 - Blynk (App for Android/IOS)
+<img src="./Client/Android_IOS/Blynk_Client_Template.png" width="50%" height="50%" />
