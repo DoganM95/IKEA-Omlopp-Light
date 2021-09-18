@@ -34,6 +34,16 @@ int rightLightBrightness = 512;
 String IpAddress = "";
 String MacAddress = "";
 
+// Counters
+const short maxWifiReconnctAttempts = 5;
+const short maxBlynkReconnectAttempts = 5;
+
+short wifiReconnectCounter = 0;
+short blynkReconnectCounter = 0;
+
+int blynkConnectionTimeout = 10000;
+int wifiConnectionTimeout = 10000;
+
 // ----------------------------------------------------------------------------
 // SETUP
 // ----------------------------------------------------------------------------
@@ -165,15 +175,21 @@ void ConnectToWifi(const char* ssid, const char* pass) {
   if (!WiFi.isConnected()) {
     Serial.printf("Connecting to Wifi: %s\n", ssid);
     try {
-      WiFi.begin(ssid, pass);
+      WiFi.begin(ssid, pass);  // initial begin as workaround to some bug
       WiFi.disconnect();
       WiFi.begin(ssid, pass);
       WiFi.setHostname("Desklight (ESP32, Blynk)");
-      WaitForWifi(1000);
-    } catch (const std::exception& e) {
+      WaitForWifi(wifiConnectionTimeout);
+      if (!WiFi.isConnected()) wifiReconnectCounter++;
+      if (wifiReconnectCounter >= maxWifiReconnctAttempts) {
+        Serial.printf("%d attempts failed to connect to wifi, rebooting..\n", wifiReconnectCounter);
+        ESP.restart();
+      }
+    } catch (const std::exception e) {
       Serial.printf("Error occured: %s\n", e.what());
     }
     Serial.printf("Connected to Wifi: %s\n", ssid);
+    blinkLights(2, 50, 50);
     WiFi.setAutoReconnect(true);
     WiFi.persistent(true);
   }
@@ -185,7 +201,7 @@ void ConnectToBlynk() {
       Blynk.begin(BLYNK_AUTH, WIFI_SSID, WIFI_PW, BLYNK_SERVER, BLYNK_PORT);
     else
       Blynk.begin(BLYNK_AUTH, WIFI_SSID, WIFI_PW);
-    WaitForBlynk(1000);
+    WaitForBlynk(blynkConnectionTimeout);
   }
 }
 
@@ -201,6 +217,20 @@ void UpdateMacAddressInBlynk() {
     MacAddress = WiFi.macAddress();
     Blynk.virtualWrite(V11, MacAddress);
   }
+}
+
+void blinkLights(short count, short onTime, short offTime) {
+  short counter = 0;
+  while (counter <= count) {
+    digitalWrite(leftLightEnable, LOW);
+    digitalWrite(rightLightEnable, LOW);
+    delay(offTime);
+    digitalWrite(leftLightEnable, HIGH);
+    digitalWrite(rightLightEnable, HIGH);
+    delay(counter >= count ? 0 : onTime);
+    counter++;
+  }
+  delay(1000);  // small break, so blinks can be distinguished
 }
 
 void SetupGpio(unsigned short int leftLightEnablePin, unsigned short int rightLightEnablePin, unsigned short int leftLightPwmPin, unsigned short int rightLightPwmPin,
