@@ -10,7 +10,8 @@
 #include <WiFi.h>              // Part of WiFi Built-In by Arduino
 #include <WiFiClient.h>        // Part of WiFi Built-In by Arduino
 #include <math.h>
-#include <pthread.h>
+
+#include "FreeRTOS.h"  // Threading library of FreeRTOS Kernel
 
 // GPIO pins
 const unsigned short int rightLightPWM = 19;
@@ -24,7 +25,7 @@ const unsigned short int rightLightPwmChannel = 6;
 const unsigned short int lightsPwmFrequency = 40000;  // higher frequency -> less flickering
 const unsigned short int lightsPwmResolution = 10;    // 10 Bit = 1024 (2^10) for Duty Cycle (0 to 1023)
 
-// Object State
+// States
 int leftLightState = 1;
 int rightLightState = 1;
 int leftLightBrightness = 512;
@@ -34,15 +35,20 @@ int rightLightBrightness = 512;
 String IpAddress = "";
 String MacAddress = "";
 
-// Counters
+// Limits
 const short maxWifiReconnctAttempts = 5;
 const short maxBlynkReconnectAttempts = 5;
 
+// Counters
 short wifiReconnectCounter = 0;
 short blynkReconnectCounter = 0;
 
+// Timeouts
 int blynkConnectionTimeout = 10000;
 int wifiConnectionTimeout = 10000;
+
+// Task Handles
+TaskHandle_t wifiConnectionHandlerThreadFunctionHandle;
 
 // ----------------------------------------------------------------------------
 // SETUP
@@ -53,6 +59,8 @@ void setup() {
 
   SetupGpio(leftLightEnable, rightLightEnable, leftLightPWM, rightLightPWM, leftLightPwmChannel, rightLightPwmChannel, lightsPwmFrequency, lightsPwmResolution);
   setInitialStateOfLights();
+
+  xTaskCreatePinnedToCore(wifiConnectionHandlerThreadFunction, "Wifi Handling Thread", 10000, NULL, 20, &wifiConnectionHandlerThreadFunctionHandle, 1);
 }
 
 // ----------------------------------------------------------------------------
@@ -60,7 +68,7 @@ void setup() {
 // ----------------------------------------------------------------------------
 
 void loop() {
-  ConnectToWifi(WIFI_SSID, WIFI_PW);
+  // ConnectToWifi(WIFI_SSID, WIFI_PW);
   ConnectToBlynk();
   UpdateIpAddressInBlynk();
   UpdateMacAddressInBlynk();
@@ -189,7 +197,7 @@ void ConnectToWifi(const char* ssid, const char* pass) {
       Serial.printf("Error occured: %s\n", e.what());
     }
     Serial.printf("Connected to Wifi: %s\n", ssid);
-    blinkLights(2, 50, 50);
+    flashLights(2, 50, 50);
     WiFi.setAutoReconnect(true);
     WiFi.persistent(true);
   }
@@ -197,11 +205,13 @@ void ConnectToWifi(const char* ssid, const char* pass) {
 
 void ConnectToBlynk() {
   if (!Blynk.connected()) {
+    Serial.printf("Connecting to Blynk: %s\n", BLYNK_USE_LOCAL_SERVER == true ? BLYNK_SERVER : "Blynk Cloud Server");
     if (BLYNK_USE_LOCAL_SERVER)
       Blynk.begin(BLYNK_AUTH, WIFI_SSID, WIFI_PW, BLYNK_SERVER, BLYNK_PORT);
     else
       Blynk.begin(BLYNK_AUTH, WIFI_SSID, WIFI_PW);
     WaitForBlynk(blynkConnectionTimeout);
+    Serial.printf("Connected to Blynk: %s\n", BLYNK_USE_LOCAL_SERVER == true ? BLYNK_SERVER : "Blynk Cloud Server");
   }
 }
 
@@ -219,7 +229,7 @@ void UpdateMacAddressInBlynk() {
   }
 }
 
-void blinkLights(short count, short onTime, short offTime) {
+void flashLights(short count, short onTime, short offTime) {
   short counter = 0;
   while (counter <= count) {
     digitalWrite(leftLightEnable, LOW);
@@ -250,6 +260,13 @@ void setInitialStateOfLights() {
   ledcWrite(rightLightPwmChannel, percentToValue(50, 1023));
   digitalWrite(rightLightEnable, HIGH);
   digitalWrite(leftLightEnable, HIGH);
+}
+
+void wifiConnectionHandlerThreadFunction(void* params) {
+  while (true) {
+    ConnectToWifi(WIFI_SSID, WIFI_PW);
+    delay(1000);
+  };
 }
 
 int percentToValue(int percent, int maxValue) { return 0 <= percent <= 100 ? round((maxValue / 100) * percent) : 1023; }
