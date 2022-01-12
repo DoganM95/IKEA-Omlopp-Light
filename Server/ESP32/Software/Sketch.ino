@@ -60,7 +60,7 @@ void setup() {
   SetupGpio(leftLightEnable, rightLightEnable, leftLightPWM, rightLightPWM, leftLightPwmChannel, rightLightPwmChannel, lightsPwmFrequency, lightsPwmResolution);
   setInitialStateOfLights();
 
-  xTaskCreatePinnedToCore(wifiConnectionHandlerThreadFunction, "Wifi Handling Thread", 10000, NULL, 20, &wifiConnectionHandlerThreadFunctionHandle, 1);
+  xTaskCreatePinnedToCore(wifiConnectionHandlerThreadFunction, "Wifi Handling Thread", 100000, NULL, 20, &wifiConnectionHandlerThreadFunctionHandle, 1);
 }
 
 // ----------------------------------------------------------------------------
