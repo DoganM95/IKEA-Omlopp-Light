@@ -39,6 +39,7 @@ String MacAddress = "";
 const short maxWifiReconnctAttempts = 5;
 const short maxBlynkReconnectAttempts = 5;
 const int wifiHandlerThreadStackSize = 10000;
+const int BlynkHandlerThreadStackSize = 10000;
 
 // Counters
 unsigned long long wifiReconnectCounter = 0;
@@ -51,6 +52,7 @@ ushort cycleDelayInMilliSeconds = 100;
 
 // Task Handles
 TaskHandle_t wifiConnectionHandlerThreadFunctionHandle;
+TaskHandle_t blynkConnectionHandlerThreadFunctionHandle;
 
 // ----------------------------------------------------------------------------
 // SETUP
@@ -62,7 +64,8 @@ void setup() {
   SetupGpio(leftLightEnable, rightLightEnable, leftLightPWM, rightLightPWM, leftLightPwmChannel, rightLightPwmChannel, lightsPwmFrequency, lightsPwmResolution);
   setInitialStateOfLights();
 
-  xTaskCreatePinnedToCore(wifiConnectionHandlerThreadFunction, "Wifi Handling Thread", wifiHandlerThreadStackSize, NULL, 20, &wifiConnectionHandlerThreadFunctionHandle, 1);
+  xTaskCreatePinnedToCore(wifiConnectionHandlerThreadFunction, "Wifi Connection Handling Thread", wifiHandlerThreadStackSize, NULL, 20, &wifiConnectionHandlerThreadFunctionHandle, 1);
+  xTaskCreatePinnedToCore(blynkConnectionHandlerThreadFunction, "Blynk Connection Handling Thread", BlynkHandlerThreadStackSize, NULL, 20, &blynkConnectionHandlerThreadFunctionHandle, 1);
 }
 
 // ----------------------------------------------------------------------------
@@ -70,8 +73,6 @@ void setup() {
 // ----------------------------------------------------------------------------
 
 void loop() {
-  // ConnectToWifi(WIFI_SSID, WIFI_PW);
-  ConnectToBlynk();
   UpdateIpAddressInBlynk();
   UpdateMacAddressInBlynk();
   Blynk.run();
@@ -182,8 +183,6 @@ void WaitForBlynk(int cycleDelayInMilliSeconds) {
 }
 
 void wifiConnectionHandlerThreadFunction(void* params) {
-  WiFi.onEvent(onWifiConnected, SYSTEM_EVENT_STA_CONNECTED);
-
   uint time;
   while (true) {
     if (!WiFi.isConnected()) {
@@ -202,33 +201,37 @@ void wifiConnectionHandlerThreadFunction(void* params) {
       } catch (const std::exception e) {
         Serial.printf("Error occured: %s\n", e.what());
       }
+      if (WiFi.isConnected()) {
+        Serial.printf("Connected to Wifi: %s\n", WIFI_SSID);
+        wifiReconnectCounter = 0;
+        flashLights(2, 50, 50);
+      }
     }
     delay(1000);
-    Serial.printf("Wifi Handler Thread current stack size: %d , current Time: %d\n", wifiHandlerThreadStackSize - uxTaskGetStackHighWaterMark(NULL), xTaskGetTickCount());
+    Serial.printf("Wifi Connection Handler Thread current stack size: %d , current Time: %d\n", wifiHandlerThreadStackSize - uxTaskGetStackHighWaterMark(NULL), xTaskGetTickCount());
   };
 }
 
-void onWifiConnected(WiFiEvent_t event, WiFiEventInfo_t info) {
-  Serial.printf("Connected to Wifi: %s\n", WIFI_SSID);
-  wifiReconnectCounter = 0;
-  flashLights(2, 50, 50);
-}
-
-void ConnectToBlynk() {
-  if (!Blynk.connected()) {
-    Serial.printf("Connecting to Blynk: %s\n", BLYNK_USE_LOCAL_SERVER == true ? BLYNK_SERVER : "Blynk Cloud Server");
-    if (BLYNK_USE_LOCAL_SERVER)
-      Blynk.config(BLYNK_AUTH, BLYNK_SERVER, BLYNK_PORT);
-    else
-      Blynk.config(BLYNK_AUTH);
-    Blynk.connect();  // Connects using the chosen Blynk.config
-    uint time = 0;
-    while (!Blynk.connected()) {
-      if (time >= blynkConnectionTimeout || Blynk.connected()) break;
-      delay(cycleDelayInMilliSeconds);
-      time += cycleDelayInMilliSeconds;
+void blynkConnectionHandlerThreadFunction(void* params) {
+  uint time;
+  while (true) {
+    if (!Blynk.connected()) {
+      Serial.printf("Connecting to Blynk: %s\n", BLYNK_USE_LOCAL_SERVER == true ? BLYNK_SERVER : "Blynk Cloud Server");
+      if (BLYNK_USE_LOCAL_SERVER)
+        Blynk.config(BLYNK_AUTH, BLYNK_SERVER, BLYNK_PORT);
+      else
+        Blynk.config(BLYNK_AUTH);
+      Blynk.connect();  // Connects using the chosen Blynk.config
+      uint time = 0;
+      while (!Blynk.connected()) {
+        if (time >= blynkConnectionTimeout || Blynk.connected()) break;
+        delay(cycleDelayInMilliSeconds);
+        time += cycleDelayInMilliSeconds;
+      }
+      if (Blynk.connected()) Serial.printf("Connected to Blynk: %s\n", BLYNK_USE_LOCAL_SERVER ? BLYNK_SERVER : "Blynk Cloud Server");
     }
-    if (Blynk.connected()) Serial.printf("Connected to Blynk: %s\n", BLYNK_USE_LOCAL_SERVER ? BLYNK_SERVER : "Blynk Cloud Server");
+    delay(1000);
+    Serial.printf("Blynk Connection Handler Thread current stack size: %d , current Time: %d\n", wifiHandlerThreadStackSize - uxTaskGetStackHighWaterMark(NULL), xTaskGetTickCount());
   }
 }
 
