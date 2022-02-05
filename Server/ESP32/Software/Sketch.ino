@@ -38,14 +38,16 @@ String MacAddress = "";
 // Limits
 const short maxWifiReconnctAttempts = 5;
 const short maxBlynkReconnectAttempts = 5;
+const int wifiHandlerThreadStackSize = 10000;
 
 // Counters
-short wifiReconnectCounter = 0;
+unsigned long long wifiReconnectCounter = 0;
 short blynkReconnectCounter = 0;
 
 // Timeouts
 int blynkConnectionTimeout = 10000;
 int wifiConnectionTimeout = 10000;
+ushort cycleDelayInMilliSeconds = 100;
 
 // Task Handles
 TaskHandle_t wifiConnectionHandlerThreadFunctionHandle;
@@ -60,7 +62,7 @@ void setup() {
   SetupGpio(leftLightEnable, rightLightEnable, leftLightPWM, rightLightPWM, leftLightPwmChannel, rightLightPwmChannel, lightsPwmFrequency, lightsPwmResolution);
   setInitialStateOfLights();
 
-  xTaskCreatePinnedToCore(wifiConnectionHandlerThreadFunction, "Wifi Handling Thread", 100000, NULL, 20, &wifiConnectionHandlerThreadFunctionHandle, 1);
+  xTaskCreatePinnedToCore(wifiConnectionHandlerThreadFunction, "Wifi Handling Thread", wifiHandlerThreadStackSize, NULL, 20, &wifiConnectionHandlerThreadFunctionHandle, 1);
 }
 
 // ----------------------------------------------------------------------------
@@ -167,7 +169,7 @@ BLYNK_WRITE(V9) {  // Right light brightness (stepper)
 
 // General functions
 
-void WaitForWifi(int cycleDelayInMilliSeconds) {
+void WaitForWifi(uint cycleDelayInMilliSeconds) {
   while (WiFi.status() != WL_CONNECTED) {
     delay(cycleDelayInMilliSeconds);
   }
@@ -179,39 +181,54 @@ void WaitForBlynk(int cycleDelayInMilliSeconds) {
   }
 }
 
-void ConnectToWifi(const char* ssid, const char* pass) {
-  if (!WiFi.isConnected()) {
-    Serial.printf("Connecting to Wifi: %s\n", ssid);
-    try {
-      WiFi.begin(ssid, pass);  // initial begin as workaround to some bug
-      WiFi.disconnect();
-      WiFi.begin(ssid, pass);
-      WiFi.setHostname("Desklight (ESP32, Blynk)");
-      WaitForWifi(wifiConnectionTimeout);
-      if (!WiFi.isConnected()) wifiReconnectCounter++;
-      if (wifiReconnectCounter >= maxWifiReconnctAttempts) {
-        Serial.printf("%d attempts failed to connect to wifi, rebooting..\n", wifiReconnectCounter);
-        ESP.restart();
+void wifiConnectionHandlerThreadFunction(void* params) {
+  WiFi.onEvent(onWifiConnected, SYSTEM_EVENT_STA_CONNECTED);
+
+  uint time;
+  while (true) {
+    if (!WiFi.isConnected()) {
+      try {
+        Serial.printf("Connecting to Wifi: %s\n", WIFI_SSID);
+        WiFi.begin(WIFI_SSID, WIFI_PW);  // initial begin as workaround to some espressif library bug
+        WiFi.disconnect();
+        WiFi.begin(WIFI_SSID, WIFI_PW);
+        WiFi.setHostname("Desklight (ESP32, Blynk)");
+        time = 0;
+        while (WiFi.status() != WL_CONNECTED) {
+          if (time >= wifiConnectionTimeout || WiFi.isConnected()) break;
+          delay(cycleDelayInMilliSeconds);
+          time += cycleDelayInMilliSeconds;
+        }
+      } catch (const std::exception e) {
+        Serial.printf("Error occured: %s\n", e.what());
       }
-    } catch (const std::exception e) {
-      Serial.printf("Error occured: %s\n", e.what());
     }
-    Serial.printf("Connected to Wifi: %s\n", ssid);
-    flashLights(2, 50, 50);
-    WiFi.setAutoReconnect(true);
-    WiFi.persistent(true);
-  }
+    delay(1000);
+    Serial.printf("Wifi Handler Thread current stack size: %d , current Time: %d\n", wifiHandlerThreadStackSize - uxTaskGetStackHighWaterMark(NULL), xTaskGetTickCount());
+  };
+}
+
+void onWifiConnected(WiFiEvent_t event, WiFiEventInfo_t info) {
+  Serial.printf("Connected to Wifi: %s\n", WIFI_SSID);
+  wifiReconnectCounter = 0;
+  flashLights(2, 50, 50);
 }
 
 void ConnectToBlynk() {
   if (!Blynk.connected()) {
     Serial.printf("Connecting to Blynk: %s\n", BLYNK_USE_LOCAL_SERVER == true ? BLYNK_SERVER : "Blynk Cloud Server");
     if (BLYNK_USE_LOCAL_SERVER)
-      Blynk.begin(BLYNK_AUTH, WIFI_SSID, WIFI_PW, BLYNK_SERVER, BLYNK_PORT);
+      Blynk.config(BLYNK_AUTH, BLYNK_SERVER, BLYNK_PORT);
     else
-      Blynk.begin(BLYNK_AUTH, WIFI_SSID, WIFI_PW);
-    WaitForBlynk(blynkConnectionTimeout);
-    Serial.printf("Connected to Blynk: %s\n", BLYNK_USE_LOCAL_SERVER == true ? BLYNK_SERVER : "Blynk Cloud Server");
+      Blynk.config(BLYNK_AUTH);
+    Blynk.connect();  // Connects using the chosen Blynk.config
+    uint time = 0;
+    while (!Blynk.connected()) {
+      if (time >= blynkConnectionTimeout || Blynk.connected()) break;
+      delay(cycleDelayInMilliSeconds);
+      time += cycleDelayInMilliSeconds;
+    }
+    if (Blynk.connected()) Serial.printf("Connected to Blynk: %s\n", BLYNK_USE_LOCAL_SERVER ? BLYNK_SERVER : "Blynk Cloud Server");
   }
 }
 
@@ -240,7 +257,6 @@ void flashLights(short count, short onTime, short offTime) {
     delay(counter >= count ? 0 : onTime);
     counter++;
   }
-  delay(1000);  // small break, so blinks can be distinguished
 }
 
 void SetupGpio(unsigned short int leftLightEnablePin, unsigned short int rightLightEnablePin, unsigned short int leftLightPwmPin, unsigned short int rightLightPwmPin,
@@ -260,13 +276,6 @@ void setInitialStateOfLights() {
   ledcWrite(rightLightPwmChannel, percentToValue(50, 1023));
   digitalWrite(rightLightEnable, HIGH);
   digitalWrite(leftLightEnable, HIGH);
-}
-
-void wifiConnectionHandlerThreadFunction(void* params) {
-  while (true) {
-    ConnectToWifi(WIFI_SSID, WIFI_PW);
-    delay(1000);
-  };
 }
 
 int percentToValue(int percent, int maxValue) { return 0 <= percent <= 100 ? round((maxValue / 100) * percent) : 1023; }
