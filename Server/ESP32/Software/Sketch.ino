@@ -47,6 +47,7 @@ short blynkReconnectCounter = 0;
 
 // Timeouts
 int blynkConnectionTimeout = 10000;
+int blynkConnectionStabilizerTimeout = 5000;
 int wifiConnectionTimeout = 10000;
 ushort cycleDelayInMilliSeconds = 100;
 
@@ -228,7 +229,10 @@ void blynkConnectionHandlerThreadFunction(void* params) {
         delay(cycleDelayInMilliSeconds);
         time += cycleDelayInMilliSeconds;
       }
-      if (Blynk.connected()) Serial.printf("Connected to Blynk: %s\n", BLYNK_USE_LOCAL_SERVER ? BLYNK_SERVER : "Blynk Cloud Server");
+      if (Blynk.connected()) {
+        Serial.printf("Connected to Blynk: %s\n", BLYNK_USE_LOCAL_SERVER ? BLYNK_SERVER : "Blynk Cloud Server");
+        delay(blynkConnectionStabilizerTimeout);
+      }
     }
     delay(1000);
     Serial.printf("Blynk Connection Handler Thread current stack size: %d , current Time: %d\n", wifiHandlerThreadStackSize - uxTaskGetStackHighWaterMark(NULL), xTaskGetTickCount());
