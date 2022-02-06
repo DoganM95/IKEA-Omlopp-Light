@@ -1,1 +1,0 @@
-const char* BLYNK_AUTH = "AuthTokenGoesHere";  // Get the token in the Blynk app on your phone (project settings)
