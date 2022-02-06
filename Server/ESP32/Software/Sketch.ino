@@ -1,9 +1,6 @@
-// Credentials
-#include "./Credentials/Blynk.h"
-#include "./Credentials/Wifi.h"
-
 // Configurations
 #include "./Configuration/Blynk.h"
+#include "./Configuration/Wifi.h"
 
 // Libraries
 #include <BlynkSimpleEsp32.h>  // Part of Blynk by Volodymyr Shymanskyy
@@ -39,7 +36,7 @@ String MacAddress = "";
 const short maxWifiReconnctAttempts = 5;
 const short maxBlynkReconnectAttempts = 5;
 const int wifiHandlerThreadStackSize = 10000;
-const int BlynkHandlerThreadStackSize = 10000;
+const int blynkHandlerThreadStackSize = 10000;
 
 // Counters
 unsigned long long wifiReconnectCounter = 0;
@@ -66,7 +63,7 @@ void setup() {
   setInitialStateOfLights();
 
   xTaskCreatePinnedToCore(wifiConnectionHandlerThreadFunction, "Wifi Connection Handling Thread", wifiHandlerThreadStackSize, NULL, 20, &wifiConnectionHandlerThreadFunctionHandle, 1);
-  xTaskCreatePinnedToCore(blynkConnectionHandlerThreadFunction, "Blynk Connection Handling Thread", BlynkHandlerThreadStackSize, NULL, 20, &blynkConnectionHandlerThreadFunctionHandle, 1);
+  xTaskCreatePinnedToCore(blynkConnectionHandlerThreadFunction, "Blynk Connection Handling Thread", blynkHandlerThreadStackSize, NULL, 20, &blynkConnectionHandlerThreadFunctionHandle, 1);
 }
 
 // ----------------------------------------------------------------------------
@@ -235,7 +232,7 @@ void blynkConnectionHandlerThreadFunction(void* params) {
       }
     }
     delay(1000);
-    Serial.printf("Blynk Connection Handler Thread current stack size: %d , current Time: %d\n", wifiHandlerThreadStackSize - uxTaskGetStackHighWaterMark(NULL), xTaskGetTickCount());
+    Serial.printf("Blynk Connection Handler Thread current stack size: %d , current Time: %d\n", blynkHandlerThreadStackSize - uxTaskGetStackHighWaterMark(NULL), xTaskGetTickCount());
   }
 }
 
