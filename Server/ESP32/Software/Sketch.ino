@@ -33,19 +33,17 @@ String IpAddress = "";
 String MacAddress = "";
 
 // Limits
-const short maxWifiReconnctAttempts = 5;
-const short maxBlynkReconnectAttempts = 5;
 const int wifiHandlerThreadStackSize = 10000;
 const int blynkHandlerThreadStackSize = 10000;
 
 // Counters
 unsigned long long wifiReconnectCounter = 0;
-short blynkReconnectCounter = 0;
+unsigned long long blynkReconnectCounter = 0;
 
 // Timeouts
+int wifiConnectionTimeout = 10000;
 int blynkConnectionTimeout = 10000;
 int blynkConnectionStabilizerTimeout = 5000;
-int wifiConnectionTimeout = 10000;
 ushort cycleDelayInMilliSeconds = 100;
 
 // Task Handles
