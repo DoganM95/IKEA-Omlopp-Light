@@ -8,8 +8,6 @@
 #include <WiFiClient.h>        // Part of WiFi Built-In by Arduino
 #include <math.h>
 
-#include "FreeRTOS.h"  // Threading library of FreeRTOS Kernel
-
 // GPIO pins
 const unsigned short int rightLightPWM = 19;
 const unsigned short int leftLightPWM = 16;
