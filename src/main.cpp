@@ -48,6 +48,16 @@ ushort cycleDelayInMilliSeconds = 100;
 TaskHandle_t wifiConnectionHandlerThreadFunctionHandle;
 TaskHandle_t blynkConnectionHandlerThreadFunctionHandle;
 
+void setInitialStateOfLights();
+void blynkConnectionHandlerThreadFunction(void* params);
+void flashLights(short count, short onTime, short offTime);
+int percentToValue(int percent, int maxValue);
+void SetupGpio(unsigned short int leftLightEnablePin, unsigned short int rightLightEnablePin, unsigned short int leftLightPwmPin, unsigned short int rightLightPwmPin,
+               unsigned short int leftLightPwmChannel, unsigned short int rightLightPwmChannel, unsigned short int lightsPwmFrequency, unsigned short int lightsPwmResolution);
+void wifiConnectionHandlerThreadFunction(void* params);
+void UpdateIpAddressInBlynk();
+void UpdateMacAddressInBlynk();
+
 // ----------------------------------------------------------------------------
 // SETUP
 // ----------------------------------------------------------------------------
